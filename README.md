@@ -8,10 +8,9 @@ How to use :
   
     3.use it in VM or burn using rufus.
  
- 
-    Made using : COSMOS dev kit 2022
+Made using : COSMOS dev kit 2022
 
-    Language used : C#
+Language used : C#
 
 Features : 
   1. Power buttons
