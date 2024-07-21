@@ -1,18 +1,4 @@
 # WindOS
-How to use : 
-
-    1.Go inside the 'ISO' folder.
-  
-    2.Get the WindOS.
-  
-    3.use it in VM or burn using rufus.
-  
-
-This is a very light OS project.
-
-Made using : COSMOS dev kit 2022
-
-Language used : C#
 
 Features :
   1. Power buttons
