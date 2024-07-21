@@ -14,6 +14,6 @@ Updates :
   1. Added Power Buttons
   2. Added Menu
 
-Upcoming Updates :
+Upcoming Updates : 
   1.Clock
   
