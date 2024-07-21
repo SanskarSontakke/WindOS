@@ -6,10 +6,14 @@ Features :
   3. Power Buttons
   4. Alpha Image Mouse.
 
+-----------------------------------------------------
 Updates : 
   1. Added Power Buttons
   2. Added Menu
   3. Alpha Image Mouse
 
+-----------------------------------------------------
 Upcoming Updates : 
   1. Clock
+
+-----------------------------------------------------
