@@ -10,7 +10,7 @@ Features :
 Updates : 
   1. Added Power Buttons
   2. Added Menu
-  3. Alpha Image Mouse
+  3. Added Alpha Image Mouse
 
 -----------------------------------------------------
 Upcoming Updates : 
