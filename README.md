@@ -1,4 +1,4 @@
-# WindOS
+# WindOS-V-0.9.0
 
 Features :
   1. Resolution : 1280 x 720 (720p)
