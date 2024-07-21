@@ -8,7 +8,7 @@ For developers who want to work with WindOS :
   1. Made using - COSMOS dev kit 2022
   2. Language - C#
   3. OS required to code - Windows
-  4. Code editoe - Visual Studio 2022
+  4. Code editor - Visual Studio 2022
 -------------------------------------------------
 Features :
   1. Resolution : 1280 x 720 (720p)
