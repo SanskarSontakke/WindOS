@@ -15,4 +15,5 @@ Features :
   2. Menu
   3. Power Buttons
   4. Alpha Image Mouse.
+  5. Clock
 -----------------------------------------------------
