@@ -1,47 +1,165 @@
 ﻿using Cosmos.Core.Memory;
 using Cosmos.System;
 using Cosmos.System.FileSystem;
-using Cosmos.System.Graphics.Fonts;
 using Cosmos.System.Graphics;
 using CosmosKernel.Commands;
 using System;
+using Sys = Cosmos.System;
+using System.Drawing;
+using IL2CPU.API.Attribs;
+using Cosmos.System.Graphics.Fonts;
 using System.Collections.Generic;
 using System.Threading;
-using System.Drawing;
 using System.Drawing.Text;
-using Sys = Cosmos.System;
 using System.IO;
 using Cosmos.Core;
-using IL2CPU.API.Attribs;
 using System.Reflection;
 using System.Resources;
 using System.Reflection.Metadata;
+using System.Runtime.InteropServices;
+using System.Diagnostics;
+using Cosmos.Core_Plugs.System.Diagnostics;
 
 namespace WindOS
 {
     public class Kernel : Sys.Kernel
     {
+        //System-------------------------------------------
         public CosmosVFS VFS;
         public CommandManager commandManager;
         public Canvas canvas;
         public MouseState prevMouseState;
         public UInt32 pX, pY;
-        public int currentWallpaper = 0;
+        public Int32 currentWallpaper = 0;
+        public Int32 currentActiveApplication;
+        private static FPSCounter fpsCounter = new FPSCounter();
+        //Menu---------------------------------------------
         public bool mouseOnWallpaperMenuButton = false;
-
+        public bool mouseOnClockMenuButton = false;
+        public bool mouseOnConsoleMenuButton = false;
         public bool menuOn = false;
         public bool mouseOnMenu = false;
         public bool prevMouseOnMenu = false;
-        public Int32 currentActiveApplication = 0;
+        //System Classes-----------------------------------
+        public class FPSCounter
+        {
+            private int frameCount;
+            private DateTime lastTime;
+            private double fps;
 
-        [ManifestResourceStream(ResourceName = "WindOS.Wallpaper010.bmp")] public static byte[] Wallpaper010Stream;
-        [ManifestResourceStream(ResourceName = "WindOS.Wallpaper020.bmp")] public static byte[] Wallpaper020Stream;
-        [ManifestResourceStream(ResourceName = "WindOS.Wallpaper030.bmp")] public static byte[] Wallpaper030Stream;
-        [ManifestResourceStream(ResourceName = "WindOS.Wallpaper040.bmp")] public static byte[] Wallpaper040Stream;
-        [ManifestResourceStream(ResourceName = "WindOS.Wallpaper050.bmp")] public static byte[] Wallpaper050Stream;
+            public FPSCounter()
+            {
+                frameCount = 0;
+                lastTime = DateTime.Now;
+                fps = 0.0;
+            }
+
+            public void Update()
+            {
+                frameCount++;
+                DateTime now = DateTime.Now;
+                TimeSpan elapsedTime = now - lastTime;
+
+                if (elapsedTime.TotalSeconds >= 1)
+                {
+                    fps = frameCount / elapsedTime.TotalSeconds;
+                    frameCount = 0;
+                    lastTime = now;
+                }
+            }
+
+            public void Draw(Canvas canvas, int x, int y)
+            {
+                canvas.DrawString($"FPS: {fps:F2}", PCScreenFont.Default, Color.White, x, y);
+            }
+        }
+        class Stopwatch
+        {
+            private DateTime _startTime;
+            private TimeSpan _elapsedTime;
+            private bool _isRunning;
+
+            public Stopwatch()
+            {
+                _elapsedTime = TimeSpan.Zero;
+                _isRunning = false;
+            }
+
+            public void Start()
+            {
+                if (!_isRunning)
+                {
+                    _startTime = DateTime.Now;
+                    _isRunning = true;
+                }
+            }
+
+            public void Stop()
+            {
+                if (_isRunning)
+                {
+                    _elapsedTime += DateTime.Now - _startTime;
+                    _isRunning = false;
+                }
+            }
+
+            public void Resume()
+            {
+                if (!_isRunning)
+                {
+                    _startTime = DateTime.Now;
+                    _isRunning = true;
+                }
+            }
+
+            public void Reset()
+            {
+                _elapsedTime = TimeSpan.Zero;
+                if (_isRunning)
+                {
+                    _startTime = DateTime.Now;
+                }
+            }
+
+            public TimeSpan Elapsed()
+            {
+                if (_isRunning)
+                {
+                    return _elapsedTime + (DateTime.Now - _startTime);
+                }
+                else
+                {
+                    return _elapsedTime;
+                }
+            }
+        }
+        class Uptime
+        {
+            private DateTime _startTime;
+
+            public Uptime()
+            {
+                _startTime = DateTime.Now;
+            }
+
+            public TimeSpan Elapsed()
+            {
+                return DateTime.Now - _startTime;
+            }
+        }
+        //Clock--------------------------------------------
+        Stopwatch stopWatch = new Stopwatch();
+        Uptime upTime = new Uptime();
+        //Fetch Resources(Wallpapers, Mouse Icon, Menu)----
+        [ManifestResourceStream(ResourceName = "WindOS.Wallpaper01.bmp")] public static byte[] Wallpaper010Stream;
+        [ManifestResourceStream(ResourceName = "WindOS.Wallpaper02.bmp")] public static byte[] Wallpaper020Stream;
+        [ManifestResourceStream(ResourceName = "WindOS.Wallpaper03.bmp")] public static byte[] Wallpaper030Stream;
+        [ManifestResourceStream(ResourceName = "WindOS.Wallpaper04.bmp")] public static byte[] Wallpaper040Stream;
+        [ManifestResourceStream(ResourceName = "WindOS.Wallpaper05.bmp")] public static byte[] Wallpaper050Stream;
         [ManifestResourceStream(ResourceName = "WindOS.cursor.bmp")] public static byte[] CursorStream;
         [ManifestResourceStream(ResourceName = "WindOS.Menu.bmp")] public static byte[] MenuStream;
-
+        [ManifestResourceStream(ResourceName = "WindOS.Clock.bmp")] public static byte[] ClockStream;
+        //Convert Resource Streams to Bitmap---------------
         public static Bitmap Wallpaper010Bitmap = new Bitmap(Wallpaper010Stream);
         public static Bitmap Wallpaper020Bitmap = new Bitmap(Wallpaper020Stream);
         public static Bitmap Wallpaper030Bitmap = new Bitmap(Wallpaper030Stream);
@@ -49,6 +167,7 @@ namespace WindOS
         public static Bitmap Wallpaper050Bitmap = new Bitmap(Wallpaper050Stream);
         public static Bitmap cursorBitmap = new Bitmap(CursorStream);
         public static Bitmap menuBitmap = new Bitmap(MenuStream);
+        public static Bitmap clockBitmap = new Bitmap(ClockStream);
 
         protected override void BeforeRun()
         {
@@ -113,11 +232,21 @@ namespace WindOS
                 {
                     Cosmos.System.Power.Reboot();
                 }
-                else if (menuOn && (new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(0, 190, 200, 60))) && (MouseManager.MouseState == MouseState.Left))
+                else if (menuOn && (new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(0, 190, 200, 60))) && (MouseManager.MouseState == MouseState.Left) && !mouseOnClockMenuButton)
                 {
+                    if (currentActiveApplication != 1)
+                        currentActiveApplication = 1;
+                    else if (currentActiveApplication == 1)
+                        currentActiveApplication = 0;
+                    mouseOnClockMenuButton = true;
                 }
-                else if (menuOn && (new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(0, 260, 200, 60))) && (MouseManager.MouseState == MouseState.Left))
+                else if (menuOn && (new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(0, 260, 200, 60))) && (MouseManager.MouseState == MouseState.Left && !mouseOnConsoleMenuButton))
                 {
+                    if (currentActiveApplication != 2)
+                        currentActiveApplication = 2;
+                    else if (currentActiveApplication == 2)
+                        currentActiveApplication = 0;
+                    mouseOnConsoleMenuButton = true;
                 }
                 else if (menuOn && (new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(0, 330, 200, 60))) && (MouseManager.MouseState == MouseState.Left) && !mouseOnWallpaperMenuButton)
                 {
@@ -131,16 +260,36 @@ namespace WindOS
                 {
                     mouseOnWallpaperMenuButton = false;
                 }
-                else if (menuOn && !(new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(0, 190, 200, 60))))
+                else if (menuOn && !(new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(0, 190, 200, 60))) && mouseOnClockMenuButton)
                 {
+                    mouseOnClockMenuButton = false;
+                }
+                else if (menuOn && !(new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(0, 330, 200, 60))) && mouseOnConsoleMenuButton)
+                {
+                    mouseOnConsoleMenuButton = false;
                 }
             }
 
-
+            switch (currentActiveApplication)
+            {
+                case 0:
+                    DrawBackground();
+                    break;
+                case 1:
+                    Clock();
+                    break;
+                case 2:
+                    Console();
+                    break;
+                default:
+                    DrawBackground();
+                    break;
+            }
             DrawTabBar();
-
             DrawMenu();
             DrawMouse();
+            fpsCounter.Update();
+            fpsCounter.Draw(canvas, 1150, 5);
             this.canvas.Display();
 
             pX = MouseManager.X;
@@ -156,6 +305,12 @@ namespace WindOS
         }
 
         public void DrawTabBar()
+        {
+            this.canvas.DrawFilledRectangle(Color.CadetBlue, 0, 0, 1280, 40);
+            this.canvas.DrawFilledRectangle(Color.OrangeRed, 0, 0, 40, 40);
+        }
+
+        public void DrawBackground()
         {
             switch (currentWallpaper)
             {
@@ -177,7 +332,6 @@ namespace WindOS
                 default:
                     break;
             }
-            this.canvas.DrawFilledRectangle(Color.OrangeRed, 0, 0, 40, 40);
         }
 
         public void DrawMenu()
@@ -186,6 +340,30 @@ namespace WindOS
             {
                 this.canvas.DrawImage(menuBitmap, 0, 40);
             }
+        }
+
+        public void Clock()
+        {
+            this.canvas.DrawLine(Color.Black, 0, 0, 0, 720);
+            this.canvas.DrawImage(clockBitmap, 1, 0);
+            this.canvas.DrawLine(Color.Black, 1280, 0, 1280, 720);
+            this.canvas.DrawString(DateTime.Now.ToString(), PCScreenFont.Default, Color.Black, 190, 140);
+            this.canvas.DrawString((DateTime.UtcNow).ToString(), PCScreenFont.Default, Color.Black, 190, 202);
+            this.canvas.DrawString((DateTime.Today).ToString(), PCScreenFont.Default, Color.Black, 190, 265);
+            this.canvas.DrawString((stopWatch.Elapsed()).ToString(), PCScreenFont.Default, Color.Black, 1049, 443);
+            this.canvas.DrawString((upTime.Elapsed()).ToString(), PCScreenFont.Default, Color.WhiteSmoke, 1049, 156);
+
+            if (!menuOn && (new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(898, 537, 189, 96))) && (MouseManager.MouseState == MouseState.Left))
+                stopWatch.Start();
+            else if (!menuOn && (new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(1087, 537, 191, 96))) && (MouseManager.MouseState == MouseState.Left))
+                stopWatch.Stop();
+            else if (!menuOn && (new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(896, 636, 382, 84))) && (MouseManager.MouseState == MouseState.Left))
+                stopWatch.Reset();
+        }
+
+        public void Console()
+        {
+            this.canvas.Clear(Color.GreenYellow);
         }
     }
 }
