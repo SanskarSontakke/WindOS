@@ -6,5 +6,5 @@ Updates :
   2. Enhanced Application Icons
 -----------------------------------------------------
 Upcoming Updates :
-  1. Maximizing and Resizing Applications
+  1. FileSystem
 -----------------------------------------------------
