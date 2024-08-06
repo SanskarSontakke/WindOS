@@ -23,7 +23,6 @@ using Cosmos.HAL;
 using System.Text;
 using Cosmos.System.Network;
 using System.Net.Http;
-using static WindOS.Kernel;
 
 //Kernel------------------------------------------------------------------------------------
 namespace WindOS
@@ -41,8 +40,28 @@ namespace WindOS
         public static FPSCounter fpsCounter = new FPSCounter();
         public static Clock clock = new Clock();
         public static Console console = new Console();
-        private DateTime lastFrameTime;
+        public static Menu menu = new Menu();
+        public static Background background = new Background();
+        public static TabBar tabBar = new TabBar();
+        public static Mouse mouse = new Mouse();
+        public static Delay delay = new Delay();
+        public static LoadingScreen loadingScreen = new LoadingScreen();
         //Menu------------------------------------------------------------------------------
+        public class Menu
+        {
+            public Menu()
+            {
+                ;
+            }
+
+            public void Draw(Canvas _canvas, bool _menuOn)
+            {
+                if (_menuOn == true)
+                {
+                    _canvas.DrawImage(menuBitmap, 0, 40);
+                }
+            }
+        }
         public bool mouseOnWallpaperMenuButton = false;
         public bool mouseOnClockMenuButton = false;
         public bool mouseOnConsoleMenuButton = false;
@@ -63,7 +82,7 @@ namespace WindOS
                 fps = 0.0;
             }
 
-            public void Update()
+            public void Update(Canvas _canvas, int _x, int _y)
             {
                 frameCount++;
                 DateTime now = DateTime.Now;
@@ -75,11 +94,13 @@ namespace WindOS
                     frameCount = 0;
                     lastTime = now;
                 }
+
+                Draw(_canvas, _x, _y);
             }
 
-            public void Draw(Canvas canvas, int x, int y)
+            private void Draw(Canvas _canvas, int _x, int _y)
             {
-                canvas.DrawString($"FPS: {fps:F2}", PCScreenFont.Default, Color.White, x, y);
+                _canvas.DrawString($"FPS: {fps:F2}", PCScreenFont.Default, Color.White, _x, _y);
             }
         }
         public class Stopwatch
@@ -156,6 +177,103 @@ namespace WindOS
                 return DateTime.Now - _startTime;
             }
         }
+        public class Background
+        {
+            public Background()
+            {
+                ;
+            }
+
+            public void Draw(Canvas _canvas, int _currentWallpaper)
+            {
+                switch (_currentWallpaper)
+                {
+                    case 0:
+                        _canvas.DrawImage(Wallpaper010Bitmap, 0, 0);
+                        break;
+                    case 1:
+                        _canvas.DrawImage(Wallpaper020Bitmap, 0, 0);
+                        break;
+                    case 2:
+                        _canvas.DrawImage(Wallpaper030Bitmap, 0, 0);
+                        break;
+                    case 3:
+                        _canvas.DrawImage(Wallpaper040Bitmap, 0, 0);
+                        break;
+                    case 4:
+                        _canvas.DrawImage(Wallpaper050Bitmap, 0, 0);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+        public class Mouse
+        {
+            public Mouse()
+            {
+                ;
+            }
+
+            public void Draw(Canvas _canvas)
+            {
+                _canvas.DrawImageAlpha(cursorBitmap, (Int32)MouseManager.X, (Int32)MouseManager.Y);
+            }
+        }
+        public class Delay
+        {
+            public Delay()
+            {
+                ;
+            }
+
+            public void Halt(int _timeinMS)
+            {
+                for (int i = 0; i < _timeinMS * 10000; i++)
+                {
+                    ;
+                    ;
+                    ;
+                    ;
+                    ;
+                }
+            }
+        }
+        public class LoadingScreen
+        {
+            public LoadingScreen()
+            {
+                ;
+            }
+
+            public void Draw(Canvas _canvas)
+            {
+                _canvas.DrawFilledRectangle(Color.WhiteSmoke, 0, 0, 1280, 720);
+                _canvas.Display();
+                delay.Halt(15000);
+                for (int i = 0; i < 450; i++)
+                {
+                    _canvas.DrawFilledRectangle(Color.Green, 415, 335, i, 50);
+                    _canvas.DrawRectangle(Color.Black, 415, 335, 450, 50);
+                    _canvas.Display();
+                    delay.Halt(200);
+                }
+            }
+        }
+        //TabBar----------------------------------------------------------------------------
+        public class TabBar
+        {
+            public TabBar()
+            {
+                ;
+            }
+
+            public void Draw( Canvas _canvas)
+            {
+                _canvas.DrawFilledRectangle(Color.CadetBlue, 0, 0, 1280, 40);
+                _canvas.DrawFilledRectangle(Color.OrangeRed, 0, 0, 40, 40);
+            }
+        }
         //Clock-----------------------------------------------------------------------------
         public class Clock
         {
@@ -164,7 +282,7 @@ namespace WindOS
                 ;
             }
 
-            public void Draw(Canvas _canvas, Stopwatch _stopWatch, Uptime _upTime)
+            private void Draw(Canvas _canvas, Stopwatch _stopWatch, Uptime _upTime)
             {
                 _canvas.DrawLine(Color.Black, 0, 0, 0, 720);
                 _canvas.DrawLine(Color.Black, 1280, 0, 1280, 720);
@@ -176,7 +294,7 @@ namespace WindOS
                 _canvas.DrawString((_upTime.Elapsed()).ToString(), PCScreenFont.Default, Color.WhiteSmoke, 1049, 156);
             }
 
-            public void Update(bool _menuOn, Stopwatch _stopWatch)
+            public void Update(Canvas _canvas, bool _menuOn, Stopwatch _stopWatch, Uptime _upTime)
             {
                 if (!_menuOn && (new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(898, 537, 189, 96))) && (MouseManager.MouseState == MouseState.Left))
                     _stopWatch.Start();
@@ -184,6 +302,8 @@ namespace WindOS
                     _stopWatch.Stop();
                 else if (!_menuOn && (new Rectangle((Int32)MouseManager.X, (Int32)MouseManager.Y, 1, 1).IntersectsWith(new Rectangle(896, 636, 382, 84))) && (MouseManager.MouseState == MouseState.Left))
                     _stopWatch.Reset();
+
+                Draw(_canvas, _stopWatch, _upTime);
             }
         }
         Stopwatch stopWatch = new Stopwatch();
@@ -262,12 +382,8 @@ namespace WindOS
         public static Bitmap clockBitmap = new Bitmap(ClockStream);
         public static Bitmap consoleBitmap = new Bitmap(ConsoleStream);
         //Initilize-CGS----------------------------------------------------------------------
-        private Stopwatch stopwatch;
         protected override void BeforeRun()
         {
-            lastFrameTime = DateTime.Now;
-            stopwatch = new Stopwatch();
-            stopwatch.Start();
             //Initilize-CGS------------------------------------------------------------------
             this.canvas = FullScreenCanvas.GetFullScreenCanvas(new Mode(1280, 720, ColorDepth.ColorDepth32));
             MouseManager.ScreenHeight = (UInt32)canvas.Mode.Height;
@@ -277,34 +393,14 @@ namespace WindOS
             Sys.FileSystem.VFS.VFSManager.RegisterVFS(this.VFS);
             //Initilize-Commsnd-Manager------------------------------------------------------
             this.commandManager = new CommandManager();
-            //Loading-Screen-----------------------------------------------------------------//Temporarily-Disabled
-            this.canvas.DrawFilledRectangle(Color.WhiteSmoke, 0, 0, 1280, 720);
-            this.canvas.Display();
-            DelayInMS(15000);
-            //for (int i = 0; i < 450; i++)
-            //{
-            //    this.canvas.DrawFilledRectangle(Color.Green, 415, 335, i, 50);
-            //    this.canvas.Display();
-            //    DelayInMS(200);
-            //}
+            //Loading-Screen-----------------------------------------------------------------
+            loadingScreen.Draw(canvas);
         }
         //Run-OS-----------------------------------------------------------------------------
         protected override void Run()
         {
             HandleGUIInputs();
             return;
-        }
-        //Delay------------------------------------------------------------------------------
-        public void DelayInMS(int ms)
-        {
-            for (int i = 0; i < ms * 10000; i++)
-            {
-                ;
-                ;
-                ;
-                ;
-                ;
-            }
         }
         //Handle-Everything------------------------------------------------------------------
         public void HandleGUIInputs()
@@ -369,75 +465,30 @@ namespace WindOS
             switch (currentActiveApplication)
             {
                 case 0:
-                    DrawBackground();
+                    background.Draw(canvas, currentWallpaper);
                     break;
                 case 1:
-                    clock.Update(menuOn, stopWatch);
-                    clock.Draw(canvas, stopWatch, upTime);
+                    clock.Update(canvas, menuOn, stopWatch, upTime);
                     break;
                 case 2:
                     console.Update(menuOn, commandManager);
                     console.Draw(canvas);
                     break;
                 default:
-                    DrawBackground();
+                    background.Draw(canvas, currentWallpaper);
                     break;
             }
             //Draw-System-Components----------------------------------------------------------
-            DrawTabBar();
-            DrawMenu();
-            fpsCounter.Update();
-            fpsCounter.Draw(canvas, 1150, 5);
-            DrawMouse();
-            this.canvas.Display();
+            tabBar.Draw(canvas);
+            menu.Draw(canvas, menuOn);
+            fpsCounter.Update(canvas, 1150, 5);
+            mouse.Draw(canvas);
+            canvas.Display();
             //Adjust-System-Components--------------------------------------------------------
             pX = MouseManager.X;
             pY = MouseManager.Y;
             prevMouseOnMenu = mouseOnMenu;
             Heap.Collect();
-        }
-        //Draw-Mouse-------------------------------------------------------------------------
-        public void DrawMouse()
-        {
-            this.canvas.DrawImageAlpha(cursorBitmap, (Int32)MouseManager.X, (Int32)MouseManager.Y);
-        }
-        //Draw-TabBar------------------------------------------------------------------------
-        public void DrawTabBar()
-        {
-            this.canvas.DrawFilledRectangle(Color.CadetBlue, 0, 0, 1280, 40);
-            this.canvas.DrawFilledRectangle(Color.OrangeRed, 0, 0, 40, 40);
-        }
-        //Draw-background--------------------------------------------------------------------
-        public void DrawBackground()
-        {
-            switch (currentWallpaper)
-            {
-                case 0:
-                    this.canvas.DrawImage(Wallpaper010Bitmap, 0, 0);
-                    break;
-                case 1:
-                    this.canvas.DrawImage(Wallpaper020Bitmap, 0, 0);
-                    break;
-                case 2:
-                    this.canvas.DrawImage(Wallpaper030Bitmap, 0, 0);
-                    break;
-                case 3:
-                    this.canvas.DrawImage(Wallpaper040Bitmap, 0, 0);
-                    break;
-                case 4:
-                    this.canvas.DrawImage(Wallpaper050Bitmap, 0, 0);
-                    break;
-                default:
-                    break;
-            }
-        }
-        //Draw-Menu--------------------------------------------------------------------------
-        public void DrawMenu()
-        {
-            if (menuOn == true)
-            {
-                this.canvas.DrawImage(menuBitmap, 0, 40);
-            }
         }
     }
 }
