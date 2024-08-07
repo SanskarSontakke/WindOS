@@ -6,5 +6,5 @@ Updates :
   2. Enhanced Application Icons
 -----------------------------------------------------
 Upcoming Updates :
-  1. FileSystem
+  1. Settings
 -----------------------------------------------------
