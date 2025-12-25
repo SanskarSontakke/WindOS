@@ -54,14 +54,15 @@ namespace WindOS.Apps
             double val;
             if (double.TryParse(input, out val)) // Number
             {
-                if (newEntry || display == "0")
+                if (newEntry || display == "0" || display == "Error")
                 {
                     display = input;
                     newEntry = false;
                 }
                 else
                 {
-                    display += input;
+                    if (display.Length < 10) // Limit digits
+                        display += input;
                 }
             }
             else // Operator or Command
@@ -77,25 +78,36 @@ namespace WindOS.Apps
                 {
                     if (!string.IsNullOrEmpty(currentOp))
                     {
-                        double secondOperand = double.Parse(display);
-                        double result = 0;
-                        switch (currentOp)
+                        double secondOperand;
+                        if (double.TryParse(display, out secondOperand))
                         {
-                            case "+": result = firstOperand + secondOperand; break;
-                            case "-": result = firstOperand - secondOperand; break;
-                            case "*": result = firstOperand * secondOperand; break;
-                            case "/": if (secondOperand != 0) result = firstOperand / secondOperand; break;
+                            double result = 0;
+                            bool error = false;
+                            switch (currentOp)
+                            {
+                                case "+": result = firstOperand + secondOperand; break;
+                                case "-": result = firstOperand - secondOperand; break;
+                                case "*": result = firstOperand * secondOperand; break;
+                                case "/":
+                                    if (secondOperand != 0) result = firstOperand / secondOperand;
+                                    else error = true;
+                                    break;
+                            }
+
+                            if (error) display = "Error";
+                            else display = result.ToString();
                         }
-                        display = result.ToString();
                         currentOp = "";
                         newEntry = true;
                     }
                 }
                 else // Operator
                 {
-                    firstOperand = double.Parse(display);
-                    currentOp = input;
-                    newEntry = true;
+                    if (double.TryParse(display, out firstOperand))
+                    {
+                         currentOp = input;
+                         newEntry = true;
+                    }
                 }
             }
         }

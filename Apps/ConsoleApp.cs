@@ -11,7 +11,10 @@ namespace WindOS.Apps
         private string input = "";
         private string output = "";
 
-        public ConsoleApp() : base("Console") { }
+        public ConsoleApp() : base("Console")
+        {
+             output = "WindOS Console v1.0\nType 'help' for commands.\n";
+        }
 
         public override void Update()
         {
@@ -20,8 +23,7 @@ namespace WindOS.Apps
                 if (key.Key == ConsoleKeyEx.Enter)
                 {
                     output += "\n> " + input;
-                    // Echo for now
-                    output += "\nCommand not found: " + input;
+                    ProcessCommand(input);
                     input = "";
                 }
                 else if (key.Key == ConsoleKeyEx.Backspace && input.Length > 0)
@@ -35,14 +37,50 @@ namespace WindOS.Apps
             }
         }
 
+        private void ProcessCommand(string cmd)
+        {
+            string cleanCmd = cmd.Trim().ToLower();
+            if (string.IsNullOrEmpty(cleanCmd)) return;
+
+            if (cleanCmd == "help")
+            {
+                output += "\nAvailable commands:\n help - Show this message\n cls - Clear screen\n echo [text] - Echo text\n reboot - Reboot system\n shutdown - Shutdown system";
+            }
+            else if (cleanCmd == "cls" || cleanCmd == "clear")
+            {
+                output = "";
+            }
+            else if (cleanCmd.StartsWith("echo "))
+            {
+                output += "\n" + cmd.Substring(5);
+            }
+            else if (cleanCmd == "reboot")
+            {
+                 Cosmos.System.Power.Reboot();
+            }
+             else if (cleanCmd == "shutdown")
+            {
+                 Cosmos.System.Power.Shutdown();
+            }
+            else
+            {
+                output += "\nCommand not found: " + cleanCmd;
+            }
+        }
+
         public override void Draw(Canvas canvas)
         {
             canvas.DrawFilledRectangle(Color.Black, 50, 50, 800, 500);
 
+            // Header bar
+            canvas.DrawFilledRectangle(Color.DimGray, 50, 50, 800, 20);
+            canvas.DrawString("Console", PCScreenFont.Default, Color.White, 55, 52);
+
             string[] lines = output.Split('\n');
-            int y = 60;
+            int y = 80;
             // Draw last 20 lines
-            int start = Math.Max(0, lines.Length - 20);
+            int maxLines = 20;
+            int start = Math.Max(0, lines.Length - maxLines);
             for(int i=start; i<lines.Length; i++)
             {
                 canvas.DrawString(lines[i], PCScreenFont.Default, Color.LightGreen, 60, y);
