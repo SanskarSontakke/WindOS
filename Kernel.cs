@@ -32,16 +32,16 @@ namespace WindOS
         private int frames = 0;
         private DateTime lastTime;
 
-        // Background
-        private int currentWallpaperIndex = 0;
-        // 0-4 bitmaps, 5+ solid colors/patterns
-        private Color[] solidColors = { Color.Teal, Color.Black, Color.DarkBlue, Color.Purple };
+        private Color[] solidColors = { Color.Teal, Color.Black, Color.DarkBlue, Color.Purple, Color.DarkRed, Color.DarkSlateGray };
 
         protected override void BeforeRun()
         {
             // Initialize File System
             VFS = new CosmosVFS();
             Cosmos.System.FileSystem.VFS.VFSManager.RegisterVFS(VFS);
+
+            // Load Config
+            ConfigManager.Load();
 
             // Initialize Graphics
             canvas = FullScreenCanvas.GetFullScreenCanvas(new Mode(1280, 720, ColorDepth.ColorDepth32));
@@ -57,7 +57,7 @@ namespace WindOS
             }
             catch
             {
-                // Fallback if resources fail loading
+                // Fallback
             }
 
             // Initialize System
@@ -67,6 +67,7 @@ namespace WindOS
             processManager.RegisterApp(new NotepadApp());
             processManager.RegisterApp(new FileExplorerApp());
             processManager.RegisterApp(new ConsoleApp());
+            processManager.RegisterApp(new SettingsApp());
 
             startMenu = new Menu(processManager);
             lockScreen = new LockScreen();
@@ -94,25 +95,45 @@ namespace WindOS
                     lockScreen.Draw(canvas);
                     DrawCursor((int)MouseManager.X, (int)MouseManager.Y);
                     canvas.Display();
+
+                    if (frames % 60 == 0) Cosmos.Core.Memory.Heap.Collect();
                     return;
                 }
 
                 // Main Logic
 
-                // Toggle Menu Input Logic (Primitive Debounce)
-                if (MouseManager.MouseState == MouseState.Left && MouseManager.X < 50 && MouseManager.Y > 680)
+                // Toggle Menu Input Logic
+                if (MouseManager.MouseState == MouseState.Left)
                 {
-                     isMenuOpen = !isMenuOpen;
-                     System.Threading.Thread.Sleep(200);
+                    // Check Start Button
+                    if (MouseManager.X < 50 && MouseManager.Y > 680)
+                    {
+                        if (!isMenuOpen)
+                        {
+                            isMenuOpen = true;
+                            startMenu.Open();
+                        }
+                        else
+                        {
+                            isMenuOpen = false;
+                            startMenu.Close();
+                        }
+                        // Debounce
+                        while (MouseManager.MouseState == MouseState.Left);
+                    }
                 }
 
-                // Toggle Wallpaper Input (Secret area top right corner)
+                // Wallpaper Toggle (Legacy/Shortcut)
                 if (MouseManager.MouseState == MouseState.Left && MouseManager.X > 1230 && MouseManager.Y < 50)
                 {
-                    currentWallpaperIndex++;
-                    if (currentWallpaperIndex > 5) currentWallpaperIndex = 0; // Cycle
-                    System.Threading.Thread.Sleep(200);
+                    ConfigManager.WallpaperIndex++;
+                    if (ConfigManager.WallpaperIndex > 5) ConfigManager.WallpaperIndex = 0;
+                    while (MouseManager.MouseState == MouseState.Left);
                 }
+
+                // Update Menu (Animation)
+                startMenu.Update();
+                if (isMenuOpen && !startMenu.IsVisible()) isMenuOpen = false; // Closed by logic inside menu
 
                 if (isMenuOpen)
                 {
@@ -132,8 +153,8 @@ namespace WindOS
                 // Taskbar
                 DrawTaskbar();
 
-                // Menu
-                if (isMenuOpen)
+                // Menu (Draw over everything)
+                if (startMenu.IsVisible())
                 {
                     startMenu.Draw(canvas);
                 }
@@ -164,18 +185,18 @@ namespace WindOS
 
         private void DrawBackground()
         {
-             if (currentWallpaperIndex == 0 && Wallpaper01 != null)
+             if (ConfigManager.WallpaperIndex == 0 && Wallpaper01 != null)
              {
                  canvas.DrawImage(Wallpaper01, 0, 0);
              }
-             else if (currentWallpaperIndex == 1 && Wallpaper02 != null)
+             else if (ConfigManager.WallpaperIndex == 1 && Wallpaper02 != null)
              {
                  canvas.DrawImage(Wallpaper02, 0, 0);
              }
              else
              {
-                 // Solid Colors
-                 int colorIndex = currentWallpaperIndex - 2;
+                 // Solid Colors based on index
+                 int colorIndex = ConfigManager.WallpaperIndex - 2;
                  if (colorIndex < 0) colorIndex = 0;
                  if (colorIndex >= solidColors.Length) colorIndex = 0;
 
@@ -185,20 +206,27 @@ namespace WindOS
 
         private void DrawTaskbar()
         {
-            canvas.DrawFilledRectangle(Color.Navy, 0, 680, 1280, 40);
+            canvas.DrawFilledRectangle(ConfigManager.TaskbarColor, 0, 680, 1280, 40);
 
             // Start Button
-            canvas.DrawFilledRectangle(isMenuOpen ? Color.DeepSkyBlue : Color.Blue, 0, 680, 50, 40);
+            canvas.DrawFilledRectangle(isMenuOpen ? ConfigManager.ThemeColor : Color.Blue, 0, 680, 50, 40);
             canvas.DrawString("Start", Cosmos.System.Graphics.Fonts.PCScreenFont.Default, Color.White, 5, 690);
 
-            // Running Apps indicators (Simple)
+            // Running Apps indicators
             int x = 60;
             foreach(var app in processManager.Apps)
             {
                 if (app == processManager.CurrentApp)
                 {
-                    canvas.DrawFilledRectangle(Color.Gray, x, 685, 100, 30);
+                    canvas.DrawFilledRectangle(Color.FromArgb(100, 255, 255, 255), x, 685, 100, 30); // Semi-transparent highlight
                 }
+
+                // Small indicator if running (active)
+                if (app.IsRunning)
+                {
+                     canvas.DrawLine(ConfigManager.ThemeColor, x, 715, x+100, 715);
+                }
+
                 canvas.DrawString(app.Name, Cosmos.System.Graphics.Fonts.PCScreenFont.Default, Color.White, x+5, 690);
                 x += 110;
             }

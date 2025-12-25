@@ -17,9 +17,11 @@ namespace WindOS.System
             {
                 if (key.Key == ConsoleKeyEx.Enter)
                 {
-                    if (pin == "1234") // Default pin
+                    // Use ConfigManager PIN
+                    if (pin == ConfigManager.PIN)
                     {
                         IsLocked = false;
+                        pin = ""; // Clear for next time
                     }
                     else
                     {
@@ -40,8 +42,13 @@ namespace WindOS.System
         public void Draw(Canvas canvas)
         {
             canvas.DrawFilledRectangle(Color.Black, 0, 0, 1280, 720);
+
+            // Time
+            string time = DateTime.Now.ToString("HH:mm");
+            canvas.DrawString(time, PCScreenFont.Default, Color.White, 600, 200);
+
             canvas.DrawString("WindOS Locked", PCScreenFont.Default, Color.White, 600, 300);
-            canvas.DrawString("Enter PIN (1234): " + new string('*', pin.Length), PCScreenFont.Default, Color.White, 580, 350);
+            canvas.DrawString("Enter PIN: " + new string('*', pin.Length), PCScreenFont.Default, Color.White, 580, 350);
         }
     }
 }
