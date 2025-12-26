@@ -4,6 +4,7 @@ using System.Drawing;
 using Cosmos.System;
 using Cosmos.System.Graphics.Fonts;
 using System.IO;
+using System.Collections.Generic;
 using WindOS.System;
 
 namespace WindOS.Apps
@@ -13,6 +14,7 @@ namespace WindOS.Apps
         private string content = "";
         private string filename = "";
         private bool isTypingFilename = false;
+        private const int MAX_CHARS_PER_LINE = 65;
 
         public NotepadApp() : base("Notepad") { }
 
@@ -29,7 +31,7 @@ namespace WindOS.Apps
                     }
                     else
                     {
-                        content = ""; // New file at path
+                        content = "";
                     }
                 }
                 catch
@@ -43,7 +45,6 @@ namespace WindOS.Apps
         {
             if (string.IsNullOrEmpty(filename))
             {
-                 // Start fresh if no file opened
                  content = "";
                  filename = "";
             }
@@ -51,9 +52,6 @@ namespace WindOS.Apps
 
         public override void OnStop()
         {
-            // Reset state on close if desired, or keep it.
-            // For now, let's clear it so next open is clean if no args passed.
-            // Actually, keep it in memory is fine, but if we want "New" behavior:
             if (string.IsNullOrEmpty(filename)) content = "";
         }
 
@@ -78,7 +76,6 @@ namespace WindOS.Apps
                     {
                         if (!string.IsNullOrEmpty(filename))
                         {
-                            // Prepend default drive if missing
                             if (!filename.Contains(@":\")) filename = @"0:\" + filename;
                             SaveFile();
                             isTypingFilename = false;
@@ -145,16 +142,23 @@ namespace WindOS.Apps
             }
             else
             {
-                // Content
+                // Content Rendering with Line Wrapping
+                int y = 140;
                 string[] lines = content.Split('\n');
-                for(int i=0; i<lines.Length; i++)
+
+                foreach (var line in lines)
                 {
-                    if (140 + (i * 20) > 490) break; // Clip
-                    canvas.DrawString(lines[i], PCScreenFont.Default, Color.Black, 110, 140 + (i * 20));
+                    // Basic split by char count for visualization (primitive wrap)
+                    for (int i = 0; i < line.Length; i += MAX_CHARS_PER_LINE)
+                    {
+                        if (y > 480) break; // Clip
+
+                        string chunk = line.Substring(i, Math.Min(MAX_CHARS_PER_LINE, line.Length - i));
+                        canvas.DrawString(chunk, PCScreenFont.Default, Color.Black, 110, y);
+                        y += 20;
+                    }
+                    if (line.Length == 0) y += 20; // Empty line
                 }
-                // Cursor
-                // Simple calculation of cursor position would be complex with word wrap,
-                // just draw at end of last line for now or skip.
             }
         }
     }

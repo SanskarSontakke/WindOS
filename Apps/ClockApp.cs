@@ -21,6 +21,7 @@ namespace WindOS.Apps
         private TimeSpan timerDuration = TimeSpan.Zero;
         private DateTime timerStart;
         private bool timerRunning = false;
+        private bool timerFinished = false;
         private string timerInput = "";
 
         public ClockApp() : base("Clock") { }
@@ -32,9 +33,9 @@ namespace WindOS.Apps
                 // Simple tabs at bottom
                 if (MouseManager.Y > 650)
                 {
-                    if (MouseManager.X > 200 && MouseManager.X < 400) { showStopwatch = false; showTimer = false; }
-                    if (MouseManager.X > 500 && MouseManager.X < 700) { showStopwatch = true; showTimer = false; }
-                    if (MouseManager.X > 800 && MouseManager.X < 1000) { showStopwatch = false; showTimer = true; }
+                    if (MouseManager.X > 200 && MouseManager.X < 400) { showStopwatch = false; showTimer = false; timerFinished = false; }
+                    if (MouseManager.X > 500 && MouseManager.X < 700) { showStopwatch = true; showTimer = false; timerFinished = false; }
+                    if (MouseManager.X > 800 && MouseManager.X < 1000) { showStopwatch = false; showTimer = true; timerFinished = false; }
                 }
 
                 // Interaction
@@ -63,11 +64,16 @@ namespace WindOS.Apps
                 }
                 else if (showTimer)
                 {
-                    // Basic timer control logic would go here
+                    // Dismiss alarm
+                    if (timerFinished && MouseManager.Y < 650)
+                    {
+                        timerFinished = false;
+                        while(MouseManager.MouseState == MouseState.Left);
+                    }
                 }
             }
 
-            if (showTimer && !timerRunning)
+            if (showTimer && !timerRunning && !timerFinished)
             {
                 if (KeyboardManager.TryReadKey(out KeyEvent key))
                 {
@@ -82,6 +88,10 @@ namespace WindOS.Apps
                          timerStart = DateTime.Now;
                          timerRunning = true;
                          timerInput = "";
+                     }
+                     else if (key.Key == ConsoleKeyEx.Backspace && timerInput.Length > 0)
+                     {
+                         timerInput = timerInput.Substring(0, timerInput.Length - 1);
                      }
                 }
             }
@@ -116,14 +126,22 @@ namespace WindOS.Apps
              }
              else if (showTimer)
              {
-                 if (timerRunning)
+                 if (timerFinished)
+                 {
+                     // Alarm state
+                     canvas.DrawFilledRectangle(Color.Red, 0, 0, 1280, 650);
+                     canvas.DrawString("TIME'S UP!", PCScreenFont.Default, Color.White, 550, 300);
+                     canvas.DrawString("Click to dismiss", PCScreenFont.Default, Color.White, 530, 350);
+                 }
+                 else if (timerRunning)
                  {
                      TimeSpan remaining = timerDuration - (DateTime.Now - timerStart);
                      if (remaining <= TimeSpan.Zero)
                      {
                          remaining = TimeSpan.Zero;
                          timerRunning = false;
-                         // Alarm sound could go here
+                         timerFinished = true;
+                         // Beep logic (Cosmos.System.PCSpeaker.Beep() could be used but sticking to graphics)
                      }
                      canvas.DrawString(remaining.ToString(@"hh\:mm\:ss"), PCScreenFont.Default, Color.White, 550, 300);
                  }

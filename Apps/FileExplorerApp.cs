@@ -125,6 +125,28 @@ namespace WindOS.Apps
                     // New Folder
                     isCreatingFolder = true;
                 }
+                else if (key.Key == ConsoleKeyEx.Delete)
+                {
+                    // Delete File/Folder
+                    if (entries.Count > 0 && selectedIndex < entries.Count)
+                    {
+                         string selected = entries[selectedIndex];
+                         try
+                         {
+                             if (selected.StartsWith("[DIR] "))
+                             {
+                                 string dir = selected.Substring(6);
+                                 Directory.Delete(dir, true); // Recursive delete
+                             }
+                             else
+                             {
+                                 File.Delete(selected);
+                             }
+                             Refresh();
+                         }
+                         catch { }
+                    }
+                }
             }
         }
 
@@ -135,7 +157,7 @@ namespace WindOS.Apps
             // Header
             canvas.DrawFilledRectangle(Color.DarkSlateGray, 200, 200, 500, 30);
             canvas.DrawString(currentPath, PCScreenFont.Default, Color.White, 210, 205);
-            canvas.DrawString("F2: New Folder | BS: Up", PCScreenFont.Default, Color.LightGray, 500, 205);
+            canvas.DrawString("F2: New Folder | BS: Up | Del: Delete", PCScreenFont.Default, Color.LightGray, 380, 205);
 
             if (isCreatingFolder)
             {
