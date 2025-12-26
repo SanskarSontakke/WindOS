@@ -12,11 +12,15 @@ WindOS is a C# operating system built using the COSMOS dev kit. It features a GU
     *   **Clock**: Real-time clock with Stopwatch and Timer.
     *   **File Explorer**: Navigate directories and manage files.
     *   **Console**: Command-line interface with basic commands.
+    *   **Paint**: Draw with different colors and brush sizes.
+    *   **Snake**: Classic arcade game.
+    *   **System Monitor**: View real-time memory usage and uptime.
 *   **System**:
     *   **Lock Screen**: Secure pin-based login (Default PIN: 1234).
     *   **Start Menu**: Launch applications and power options.
     *   **Taskbar**: View running apps and current time.
     *   **Wallpapers**: Switch between backgrounds (top-right corner click).
+    *   **Settings**: Customize theme, taskbar color, and security PIN.
 
 ## How to Use
 
@@ -25,8 +29,9 @@ WindOS is a C# operating system built using the COSMOS dev kit. It features a GU
 3.  **Interaction**:
     *   **Menu**: Click the 'Start' button.
     *   **Wallpaper**: Click the top-right corner of the screen to cycle wallpapers.
-    *   **File Explorer**: Use `Arrow Keys` to navigate, `Enter` to open, `Backspace` to go up. `F2` to create a folder.
+    *   **File Explorer**: Use `Arrow Keys` to navigate, `Enter` to open, `Backspace` to go up. `F2` to create a folder. `Delete` to remove files.
     *   **Notepad**: Type normally. `F1` to save.
+    *   **Paint**: Click colors to select, draw on canvas. Use 'Clear' to reset.
 
 ## For Developers
 
