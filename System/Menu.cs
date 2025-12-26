@@ -22,6 +22,9 @@ namespace WindOS
             items.Add("Clock");
             items.Add("Calculator");
             items.Add("Notepad");
+            items.Add("Paint");
+            items.Add("Snake");
+            items.Add("Monitor");
             items.Add("Explorer");
             items.Add("Console");
             items.Add("Shutdown");

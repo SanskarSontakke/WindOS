@@ -68,6 +68,9 @@ namespace WindOS
             processManager.RegisterApp(new FileExplorerApp());
             processManager.RegisterApp(new ConsoleApp());
             processManager.RegisterApp(new SettingsApp());
+            processManager.RegisterApp(new PaintApp());
+            processManager.RegisterApp(new SnakeApp());
+            processManager.RegisterApp(new SystemMonitorApp());
 
             startMenu = new Menu(processManager);
             lockScreen = new LockScreen();
