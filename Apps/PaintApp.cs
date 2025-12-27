@@ -1,31 +1,22 @@
 using System;
 using Cosmos.System.Graphics;
-using System.Drawing;
 using Cosmos.System;
 using Cosmos.System.Graphics.Fonts;
 using System.Collections.Generic;
+using System.Drawing;
 
 namespace WindOS.Apps
 {
+    // Full-screen Paint for 640x480
     public class PaintApp : App
     {
-        private Color currentColor = Color.Black;
-        private int brushSize = 5;
-        // We can't easily store a full bitmap for the canvas state in memory without eating RAM fast in Cosmos if we create a new Bitmap every frame.
-        // A better approach for Cosmos paint is to store a list of "DrawPoints" or just rely on the fact that we clear screen every frame?
-        // Wait, Cosmos Canvas clears every frame in the Kernel loop usually?
-        // In this architecture, `processManager.Draw(canvas)` is called every frame.
-        // If we want persistent drawing, we need to store the draw commands.
-
         private List<DrawPoint> points = new List<DrawPoint>();
+        private Color currentColor = Color.White;
+        private int brushSize = 4;
 
-        private struct DrawPoint
-        {
-            public int X;
-            public int Y;
-            public Color Color;
-            public int Size;
-        }
+        private struct DrawPoint { public int X, Y, Size; public Color C; }
+
+        private static readonly Color[] palette = { Color.White, Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Black };
 
         public PaintApp() : base("Paint") { }
 
@@ -33,82 +24,64 @@ namespace WindOS.Apps
         {
             if (MouseManager.MouseState == MouseState.Left)
             {
-                // Toolbar interaction
-                if (MouseManager.Y < 50)
+                int my = (int)MouseManager.Y;
+
+                // Toolbar (top 30px)
+                if (my < 30)
                 {
-                    // Palette
-                    if (CheckClick(10, 10, 30, 30)) currentColor = Color.Black;
-                    if (CheckClick(50, 10, 30, 30)) currentColor = Color.Red;
-                    if (CheckClick(90, 10, 30, 30)) currentColor = Color.Green;
-                    if (CheckClick(130, 10, 30, 30)) currentColor = Color.Blue;
-                    if (CheckClick(170, 10, 30, 30)) currentColor = Color.White; // Eraser
-
-                    // Brush Size
-                    if (CheckClick(250, 10, 30, 30)) brushSize = 5;
-                    if (CheckClick(290, 10, 30, 30)) brushSize = 10;
-                    if (CheckClick(330, 10, 30, 30)) brushSize = 20;
-
+                    int mx = (int)MouseManager.X;
+                    // Color palette
+                    for (int i = 0; i < palette.Length; i++)
+                    {
+                        if (mx >= 10 + i * 35 && mx < 40 + i * 35) currentColor = palette[i];
+                    }
+                    // Brush sizes
+                    if (mx >= 250 && mx < 280) brushSize = 2;
+                    if (mx >= 290 && mx < 320) brushSize = 6;
+                    if (mx >= 330 && mx < 360) brushSize = 12;
                     // Clear
-                    if (CheckClick(400, 10, 80, 30)) points.Clear();
+                    if (mx >= 400 && mx < 480) { points.Clear(); while (MouseManager.MouseState == MouseState.Left) { } }
                 }
                 else
                 {
                     // Drawing
-                    // Add point if mouse moved or clicked
-                    // Optimization: Don't add if exactly same as last point
-                    points.Add(new DrawPoint
-                    {
-                        X = (int)MouseManager.X,
-                        Y = (int)MouseManager.Y,
-                        Color = currentColor,
-                        Size = brushSize
-                    });
+                    points.Add(new DrawPoint { X = (int)MouseManager.X, Y = my, Size = brushSize, C = currentColor });
                 }
             }
         }
 
-        private bool CheckClick(int x, int y, int w, int h)
-        {
-            return MouseManager.X >= x && MouseManager.X <= x + w &&
-                   MouseManager.Y >= y && MouseManager.Y <= y + h;
-        }
-
         public override void Draw(Canvas canvas)
         {
-            // Canvas Background
-            canvas.DrawFilledRectangle(Color.White, 0, 50, 1280, 670);
+            // Canvas area (below toolbar)
+            canvas.DrawFilledRectangle(Kernel.BlackPen, 0, 30, Kernel.ScreenWidth, Kernel.ScreenHeight - 30);
 
             // Draw all points
-            // Note: This might get slow with thousands of points.
-            // A real paint app in Cosmos usually writes to an off-screen buffer/bitmap,
-            // but for simplicity we re-draw the list.
-            foreach (var p in points)
+            for (int i = 0; i < points.Count; i++)
             {
-                canvas.DrawFilledCircle(p.Color, p.X, p.Y, p.Size / 2);
+                var p = points[i];
+                canvas.DrawFilledCircle(new Pen(p.C), p.X, p.Y, p.Size);
             }
 
             // Toolbar
-            canvas.DrawFilledRectangle(Color.LightGray, 0, 0, 1280, 50);
+            canvas.DrawFilledRectangle(Kernel.GrayPen, 0, 0, Kernel.ScreenWidth, 30);
 
-            // Colors
-            canvas.DrawFilledRectangle(Color.Black, 10, 10, 30, 30);
-            canvas.DrawFilledRectangle(Color.Red, 50, 10, 30, 30);
-            canvas.DrawFilledRectangle(Color.Green, 90, 10, 30, 30);
-            canvas.DrawFilledRectangle(Color.Blue, 130, 10, 30, 30);
-            canvas.DrawFilledRectangle(Color.White, 170, 10, 30, 30); canvas.DrawRectangle(Color.Black, 170, 10, 30, 30); // Eraser border
+            // Color palette
+            for (int i = 0; i < palette.Length; i++)
+            {
+                canvas.DrawFilledRectangle(new Pen(palette[i]), 10 + i * 35, 3, 25, 24);
+            }
 
-            // Sizes
-            canvas.DrawFilledCircle(Color.Black, 265, 25, 2);
-            canvas.DrawFilledCircle(Color.Black, 305, 25, 5);
-            canvas.DrawFilledCircle(Color.Black, 345, 25, 10);
+            // Brush sizes
+            canvas.DrawFilledCircle(Kernel.WhitePen, 265, 15, 2);
+            canvas.DrawFilledCircle(Kernel.WhitePen, 305, 15, 6);
+            canvas.DrawFilledCircle(Kernel.WhitePen, 345, 15, 10);
 
-            // Clear
-            canvas.DrawFilledRectangle(Color.DarkRed, 400, 10, 80, 30);
-            canvas.DrawString("Clear", PCScreenFont.Default, Color.White, 415, 18);
+            // Clear button
+            canvas.DrawFilledRectangle(Kernel.RedPen, 400, 3, 80, 24);
+            canvas.DrawString("Clear", PCScreenFont.Default, Kernel.WhitePen, 420, 8);
 
-            // Current Indicator
-            canvas.DrawString($"Color", PCScreenFont.Default, currentColor, 500, 18);
-            canvas.DrawString($"Size: {brushSize}", PCScreenFont.Default, Color.Black, 580, 18);
+            // ESC hint
+            canvas.DrawString("[ESC]", PCScreenFont.Default, Kernel.BlackPen, Kernel.ScreenWidth - 50, 8);
         }
     }
 }

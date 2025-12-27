@@ -1,132 +1,83 @@
-using System.Collections.Generic;
+using System.Drawing;
 using WindOS.Apps;
 using WindOS.System;
 using Cosmos.System;
+using Cosmos.System.Graphics;
+using Cosmos.System.Graphics.Fonts;
 
 namespace WindOS
 {
     public class Menu
     {
-        private List<string> items = new List<string>();
         private ProcessManager pm;
-
-        // Animation
-        private int currentHeight = 0;
-        private int targetHeight = 0;
         private bool isOpen = false;
 
-        public Menu(ProcessManager processManager)
-        {
-            pm = processManager;
-            items.Add("Settings");
-            items.Add("Clock");
-            items.Add("Calculator");
-            items.Add("Notepad");
-            items.Add("Paint");
-            items.Add("Snake");
-            items.Add("Monitor");
-            items.Add("Explorer");
-            items.Add("Console");
-            items.Add("Shutdown");
-            items.Add("Reboot");
+        // Simple app list
+        private static readonly string[] items = { "Clock", "Calculator", "Notepad", "Paint", "Snake", "Console", "Files", "Monitor", "Settings", "Shutdown" };
+        private const int ItemCount = 10;
+        private const int ItemHeight = 20;
+        private const int MenuWidth = 100;
 
-            targetHeight = items.Count * 40;
-        }
+        private static Pen menuBgPen = new Pen(Color.FromArgb(50, 50, 70));
+        private static Pen hoverPen = new Pen(Color.FromArgb(80, 100, 140));
 
-        public void Open()
-        {
-            isOpen = true;
-            // Reset animation if needed, or let it slide up
-        }
+        public Menu(ProcessManager processManager) { pm = processManager; }
 
-        public void Close()
-        {
-            isOpen = false;
-        }
+        public void Open() { isOpen = true; }
+        public void Close() { isOpen = false; }
+        public bool IsVisible() { return isOpen; }
 
         public void HandleInput()
         {
-            if (MouseManager.MouseState == MouseState.Left && isOpen)
+            if (MouseManager.MouseState != MouseState.Left || !isOpen) return;
+
+            int menuTop = Kernel.ScreenHeight - 30 - (ItemCount * ItemHeight);
+            int menuBottom = Kernel.ScreenHeight - 30;
+
+            if (MouseManager.X < MenuWidth && MouseManager.Y >= menuTop && MouseManager.Y < menuBottom)
             {
-                int menuHeight = items.Count * 40;
-                int startY = 680 - menuHeight; // Above taskbar
-
-                // Check if click is inside menu
-                if (MouseManager.X >= 0 && MouseManager.X <= 200 &&
-                    MouseManager.Y >= startY && MouseManager.Y <= 680)
+                int idx = (int)((MouseManager.Y - menuTop) / ItemHeight);
+                if (idx >= 0 && idx < ItemCount)
                 {
-                    int clickedIndex = (int)((MouseManager.Y - startY) / 40);
-                    if (clickedIndex >= 0 && clickedIndex < items.Count)
-                    {
-                         string item = items[clickedIndex];
-                        if (item == "Shutdown") Cosmos.System.Power.Shutdown();
-                        else if (item == "Reboot") Cosmos.System.Power.Reboot();
-                        else
-                        {
-                            pm.StartApp(item);
-                            Close();
-                        }
-
-                        // Wait for release
-                        while(MouseManager.MouseState == MouseState.Left);
-                    }
+                    LaunchApp(idx);
+                    while (MouseManager.MouseState == MouseState.Left) { }
                 }
-                else
-                {
-                    // Click outside, close
-                    if (MouseManager.Y < 680) // Ignore taskbar clicks here, kernel handles toggle
-                        Close();
-                }
+            }
+            else if (MouseManager.Y < menuBottom)
+            {
+                Close();
             }
         }
 
-        public void Update()
+        private void LaunchApp(int idx)
         {
-            // Animation Logic
-            if (isOpen)
-            {
-                if (currentHeight < targetHeight) currentHeight += 20; // Speed
-                if (currentHeight > targetHeight) currentHeight = targetHeight;
-            }
+            string[] appNames = { "Clock", "Calculator", "Notepad", "Paint", "Snake", "Console", "Explorer", "Monitor", "Settings", "" };
+            if (idx == 9) Cosmos.System.Power.Shutdown();
             else
             {
-                if (currentHeight > 0) currentHeight -= 20;
-                if (currentHeight < 0) currentHeight = 0;
+                pm.StartApp(appNames[idx]);
+                Close();
             }
         }
 
-        public bool IsVisible()
+        public void Draw(Canvas canvas)
         {
-            return currentHeight > 0;
-        }
+            if (!isOpen) return;
 
-        public void Draw(Cosmos.System.Graphics.Canvas canvas)
-        {
-            if (currentHeight <= 0) return;
+            int menuTop = Kernel.ScreenHeight - 30 - (ItemCount * ItemHeight);
+            canvas.DrawFilledRectangle(menuBgPen, 0, menuTop, MenuWidth, ItemCount * ItemHeight);
 
-            int startY = 680 - currentHeight;
+            int mx = (int)MouseManager.X;
+            int my = (int)MouseManager.Y;
 
-            // Draw menu background
-            canvas.DrawFilledRectangle(ConfigManager.TaskbarColor, 0, startY, 200, currentHeight);
-
-            // Draw items (only if fully open or clip? Simple approach: draw all clipped)
-            // Ideally we draw only what fits, but we just draw them relative to startY
-
-            // We need to shift items so they appear to slide up.
-            // Standard slide up: content moves with window.
-
-            int y = startY;
-            for (int i = 0; i < items.Count; i++)
+            for (int i = 0; i < ItemCount; i++)
             {
-                // Simple highlight on hover
-                if (MouseManager.X >= 0 && MouseManager.X <= 200 && MouseManager.Y >= y && MouseManager.Y <= y + 40)
+                int y = menuTop + (i * ItemHeight);
+                if (mx < MenuWidth && my >= y && my < y + ItemHeight)
                 {
-                    canvas.DrawFilledRectangle(ConfigManager.ThemeColor, 0, y, 200, 40);
+                    canvas.DrawFilledRectangle(hoverPen, 0, y, MenuWidth, ItemHeight);
                 }
-
-                canvas.DrawString(items[i], Cosmos.System.Graphics.Fonts.PCScreenFont.Default, System.Drawing.Color.White, 10, y + 10);
-                canvas.DrawLine(System.Drawing.Color.Gray, 0, y + 40, 200, y + 40);
-                y += 40;
+                canvas.DrawString(items[i], PCScreenFont.Default, Kernel.WhitePen, 5, y + 4);
             }
         }
     }

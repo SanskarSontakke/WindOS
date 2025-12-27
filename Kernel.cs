@@ -17,50 +17,60 @@ namespace WindOS
         public static Menu startMenu;
         public static LockScreen lockScreen;
 
-        // Resources
         [ManifestResourceStream(ResourceName = "WindOS.cursor.bmp")] public static byte[] CursorStream;
-        public static Bitmap cursorBitmap;
-
         [ManifestResourceStream(ResourceName = "WindOS.Wallpaper01.bmp")] public static byte[] Wallpaper01Stream;
-        public static Bitmap Wallpaper01;
-
         [ManifestResourceStream(ResourceName = "WindOS.Wallpaper02.bmp")] public static byte[] Wallpaper02Stream;
-        public static Bitmap Wallpaper02;
 
-        private bool isMenuOpen = false;
+        // 640x480 resolution
+        public const int ScreenWidth = 640;
+        public const int ScreenHeight = 480;
+
+        // State
+        private bool showMenu = false;
         private int fps = 0;
         private int frames = 0;
         private DateTime lastTime;
+        private string fpsText = "0";
 
-        private Color[] solidColors = { Color.Teal, Color.Black, Color.DarkBlue, Color.Purple, Color.DarkRed, Color.DarkSlateGray };
+        // Cached Pens - shared by all apps
+        public static Pen WhitePen;
+        public static Pen BlackPen;
+        public static Pen YellowPen;
+        public static Pen BluePen;
+        public static Pen RedPen;
+        public static Pen GreenPen;
+        public static Pen GrayPen;
+        public static Pen LimePen;
+        public static Pen DarkBluePen;
+        public static Pen LightGrayPen;
+        public static Pen CyanPen;
 
         protected override void BeforeRun()
         {
-            // Initialize File System
+            // Initialize Pens once
+            WhitePen = new Pen(Color.White);
+            BlackPen = new Pen(Color.Black);
+            YellowPen = new Pen(Color.Yellow);
+            BluePen = new Pen(Color.Blue);
+            RedPen = new Pen(Color.Red);
+            GreenPen = new Pen(Color.Green);
+            GrayPen = new Pen(Color.Gray);
+            LimePen = new Pen(Color.Lime);
+            DarkBluePen = new Pen(Color.DarkBlue);
+            LightGrayPen = new Pen(Color.LightGray);
+            CyanPen = new Pen(Color.Cyan);
+
+            // File System
             VFS = new CosmosVFS();
             Cosmos.System.FileSystem.VFS.VFSManager.RegisterVFS(VFS);
-
-            // Load Config
             ConfigManager.Load();
 
-            // Initialize Graphics
-            canvas = FullScreenCanvas.GetFullScreenCanvas(new Mode(1280, 720, ColorDepth.ColorDepth32));
-            MouseManager.ScreenHeight = (uint)canvas.Mode.Height;
-            MouseManager.ScreenWidth = (uint)canvas.Mode.Width;
+            // Graphics
+            canvas = FullScreenCanvas.GetFullScreenCanvas(new Mode(ScreenWidth, ScreenHeight, ColorDepth.ColorDepth32));
+            MouseManager.ScreenHeight = (uint)ScreenHeight;
+            MouseManager.ScreenWidth = (uint)ScreenWidth;
 
-            // Load Resources
-            try
-            {
-                cursorBitmap = new Bitmap(CursorStream);
-                Wallpaper01 = new Bitmap(Wallpaper01Stream);
-                Wallpaper02 = new Bitmap(Wallpaper02Stream);
-            }
-            catch
-            {
-                // Fallback
-            }
-
-            // Initialize System
+            // Register Apps
             processManager = new ProcessManager();
             processManager.RegisterApp(new ClockApp());
             processManager.RegisterApp(new CalculatorApp());
@@ -74,184 +84,113 @@ namespace WindOS
 
             startMenu = new Menu(processManager);
             lockScreen = new LockScreen();
-
             lastTime = DateTime.Now;
         }
 
         protected override void Run()
         {
-            try
+            // FPS counter
+            frames++;
+            if ((DateTime.Now - lastTime).TotalSeconds >= 1)
             {
-                // Update FPS
-                frames++;
-                if ((DateTime.Now - lastTime).TotalSeconds >= 1)
+                fps = frames;
+                fpsText = fps.ToString();
+                frames = 0;
+                lastTime = DateTime.Now;
+                Cosmos.Core.Memory.Heap.Collect();
+            }
+
+            // Clamp cursor to screen
+            if (MouseManager.X >= ScreenWidth) MouseManager.X = (uint)(ScreenWidth - 1);
+            if (MouseManager.Y >= ScreenHeight) MouseManager.Y = (uint)(ScreenHeight - 1);
+
+            // === LOCK SCREEN ===
+            if (lockScreen.IsLocked)
+            {
+                lockScreen.Update();
+                lockScreen.Draw(canvas);
+                DrawCursor();
+                canvas.Display();
+                return;
+            }
+
+            // === APP RUNNING - FULL SCREEN MODE ===
+            if (processManager.CurrentApp != null)
+            {
+                // ESC to close app
+                if (KeyboardManager.TryReadKey(out KeyEvent key) && key.Key == ConsoleKeyEx.Escape)
                 {
-                    fps = frames;
-                    frames = 0;
-                    lastTime = DateTime.Now;
-                }
-
-                // Lock Screen
-                if (lockScreen.IsLocked)
-                {
-                    lockScreen.Update();
-                    lockScreen.Draw(canvas);
-                    DrawCursor((int)MouseManager.X, (int)MouseManager.Y);
-                    canvas.Display();
-
-                    if (frames % 60 == 0) Cosmos.Core.Memory.Heap.Collect();
-                    return;
-                }
-
-                // Main Logic
-
-                // Toggle Menu Input Logic
-                if (MouseManager.MouseState == MouseState.Left)
-                {
-                    // Check Start Button
-                    if (MouseManager.X < 50 && MouseManager.Y > 680)
-                    {
-                        if (!isMenuOpen)
-                        {
-                            isMenuOpen = true;
-                            startMenu.Open();
-                        }
-                        else
-                        {
-                            isMenuOpen = false;
-                            startMenu.Close();
-                        }
-                        // Debounce
-                        while (MouseManager.MouseState == MouseState.Left);
-                    }
-                }
-
-                // Wallpaper Toggle (Legacy/Shortcut)
-                if (MouseManager.MouseState == MouseState.Left && MouseManager.X > 1230 && MouseManager.Y < 50)
-                {
-                    ConfigManager.WallpaperIndex++;
-                    if (ConfigManager.WallpaperIndex > 5) ConfigManager.WallpaperIndex = 0;
-                    while (MouseManager.MouseState == MouseState.Left);
-                }
-
-                // Update Menu (Animation)
-                startMenu.Update();
-                if (isMenuOpen && !startMenu.IsVisible()) isMenuOpen = false; // Closed by logic inside menu
-
-                if (isMenuOpen)
-                {
-                    startMenu.HandleInput();
+                    processManager.StopCurrentApp();
                 }
                 else
                 {
                     processManager.Update();
+                    // App draws EVERYTHING (full screen)
+                    canvas.DrawFilledRectangle(BlackPen, 0, 0, ScreenWidth, ScreenHeight);
+                    processManager.Draw(canvas);
                 }
-
-                // Draw
-                DrawBackground();
-
-                // Current App
-                processManager.Draw(canvas);
-
-                // Taskbar
-                DrawTaskbar();
-
-                // Menu (Draw over everything)
-                if (startMenu.IsVisible())
-                {
-                    startMenu.Draw(canvas);
-                }
-
-                // FPS
-                canvas.DrawString("FPS: " + fps, Cosmos.System.Graphics.Fonts.PCScreenFont.Default, Color.Yellow, 1200, 10);
-
-                // Mouse
-                DrawCursor((int)MouseManager.X, (int)MouseManager.Y);
-
+                
+                // FPS in corner
+                canvas.DrawString(fpsText, Cosmos.System.Graphics.Fonts.PCScreenFont.Default, YellowPen, ScreenWidth - 30, 5);
+                DrawCursor();
                 canvas.Display();
+                return;
+            }
 
-                // Memory Management optimization
-                if (frames % 60 == 0)
+            // === DESKTOP MODE (no app running) ===
+            
+            // Input
+            if (MouseManager.MouseState == MouseState.Left)
+            {
+                // Menu button (bottom-left corner)
+                if (MouseManager.X < 60 && MouseManager.Y > ScreenHeight - 30)
                 {
-                    Cosmos.Core.Memory.Heap.Collect();
+                    showMenu = !showMenu;
+                    if (showMenu) startMenu.Open();
+                    else startMenu.Close();
+                    while (MouseManager.MouseState == MouseState.Left) { }
                 }
             }
-            catch (Exception e)
+
+            // Update menu
+            if (showMenu)
             {
-                // BSOD
-                canvas.DrawFilledRectangle(Color.Blue, 0, 0, 1280, 720);
-                canvas.DrawString("BSOD: " + e.Message, Cosmos.System.Graphics.Fonts.PCScreenFont.Default, Color.White, 100, 100);
-                canvas.Display();
-                System.Threading.Thread.Sleep(5000);
+                startMenu.HandleInput();
+                if (!startMenu.IsVisible()) showMenu = false;
             }
+
+            // Draw desktop
+            canvas.DrawFilledRectangle(DarkBluePen, 0, 0, ScreenWidth, ScreenHeight);
+
+            // Simple taskbar
+            canvas.DrawFilledRectangle(GrayPen, 0, ScreenHeight - 30, ScreenWidth, 30);
+            canvas.DrawFilledRectangle(showMenu ? GreenPen : BluePen, 0, ScreenHeight - 30, 60, 30);
+            canvas.DrawString("Menu", Cosmos.System.Graphics.Fonts.PCScreenFont.Default, WhitePen, 10, ScreenHeight - 22);
+
+            // Time
+            canvas.DrawString(DateTime.Now.ToString("HH:mm"), Cosmos.System.Graphics.Fonts.PCScreenFont.Default, WhitePen, ScreenWidth - 50, ScreenHeight - 22);
+
+            // Menu overlay
+            if (showMenu)
+            {
+                startMenu.Draw(canvas);
+            }
+
+            // FPS
+            canvas.DrawString(fpsText, Cosmos.System.Graphics.Fonts.PCScreenFont.Default, YellowPen, ScreenWidth - 30, 5);
+
+            DrawCursor();
+            canvas.Display();
         }
 
-        private void DrawBackground()
+        private void DrawCursor()
         {
-             if (ConfigManager.WallpaperIndex == 0 && Wallpaper01 != null)
-             {
-                 canvas.DrawImage(Wallpaper01, 0, 0);
-             }
-             else if (ConfigManager.WallpaperIndex == 1 && Wallpaper02 != null)
-             {
-                 canvas.DrawImage(Wallpaper02, 0, 0);
-             }
-             else
-             {
-                 // Solid Colors based on index
-                 int colorIndex = ConfigManager.WallpaperIndex - 2;
-                 if (colorIndex < 0) colorIndex = 0;
-                 if (colorIndex >= solidColors.Length) colorIndex = 0;
-
-                 canvas.DrawFilledRectangle(solidColors[colorIndex], 0, 0, 1280, 720);
-             }
-        }
-
-        private void DrawTaskbar()
-        {
-            canvas.DrawFilledRectangle(ConfigManager.TaskbarColor, 0, 680, 1280, 40);
-
-            // Start Button
-            canvas.DrawFilledRectangle(isMenuOpen ? ConfigManager.ThemeColor : Color.Blue, 0, 680, 50, 40);
-            canvas.DrawString("Start", Cosmos.System.Graphics.Fonts.PCScreenFont.Default, Color.White, 5, 690);
-
-            // Running Apps indicators
-            int x = 60;
-            foreach(var app in processManager.Apps)
-            {
-                if (app == processManager.CurrentApp)
-                {
-                    canvas.DrawFilledRectangle(Color.FromArgb(100, 255, 255, 255), x, 685, 100, 30); // Semi-transparent highlight
-                }
-
-                // Small indicator if running (active)
-                if (app.IsRunning)
-                {
-                     canvas.DrawLine(ConfigManager.ThemeColor, x, 715, x+100, 715);
-                }
-
-                canvas.DrawString(app.Name, Cosmos.System.Graphics.Fonts.PCScreenFont.Default, Color.White, x+5, 690);
-                x += 110;
-            }
-
-            // Clock on taskbar
-            string time = DateTime.Now.ToString("HH:mm");
-            canvas.DrawString(time, Cosmos.System.Graphics.Fonts.PCScreenFont.Default, Color.White, 1200, 690);
-        }
-
-        private void DrawCursor(int x, int y)
-        {
-            if (cursorBitmap != null)
-            {
-                canvas.DrawImageAlpha(cursorBitmap, x, y);
-            }
-            else
-            {
-                // Fallback
-                canvas.DrawLine(Color.White, x, y, x, y + 15);
-                canvas.DrawLine(Color.White, x, y, x + 10, y + 10);
-                canvas.DrawLine(Color.White, x, y + 15, x + 10, y + 10);
-            }
+            int x = (int)MouseManager.X;
+            int y = (int)MouseManager.Y;
+            // Simple triangle cursor
+            canvas.DrawLine(WhitePen, x, y, x, y + 12);
+            canvas.DrawLine(WhitePen, x, y, x + 8, y + 8);
+            canvas.DrawLine(WhitePen, x, y + 12, x + 8, y + 8);
         }
     }
 }

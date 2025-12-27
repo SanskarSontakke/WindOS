@@ -1,12 +1,11 @@
 using System;
 using Cosmos.System.Graphics;
-using System.Drawing;
 using Cosmos.System;
 using Cosmos.System.Graphics.Fonts;
-using WindOS.System;
 
 namespace WindOS.Apps
 {
+    // Full-screen Calculator for 640x480
     public class CalculatorApp : App
     {
         private string display = "0";
@@ -14,126 +13,98 @@ namespace WindOS.Apps
         private double firstOperand = 0;
         private bool newEntry = true;
 
-        // Button layout
-        private string[] buttons = { "7", "8", "9", "/", "4", "5", "6", "*", "1", "2", "3", "-", "C", "0", "=", "+" };
-        private int btnSize = 60;
-        private int startX = 400;
-        private int startY = 200;
+        private static readonly string[] buttons = { "7", "8", "9", "/", "4", "5", "6", "*", "1", "2", "3", "-", "C", "0", "=", "+" };
+        private const int BtnSize = 60;
+        private const int BtnGap = 10;
 
         public CalculatorApp() : base("Calculator") { }
 
         public override void Update()
         {
-            // Simple click detection
             if (MouseManager.MouseState == MouseState.Left)
             {
-                // Check clicks on buttons
-                int x = 0, y = 0;
-                for (int i = 0; i < buttons.Length; i++)
-                {
-                    int btnX = startX + (x * (btnSize + 10));
-                    int btnY = startY + 100 + (y * (btnSize + 10));
+                int startX = (Kernel.ScreenWidth - (4 * BtnSize + 3 * BtnGap)) / 2;
+                int startY = 150;
 
-                    if (MouseManager.X >= btnX && MouseManager.X <= btnX + btnSize &&
-                        MouseManager.Y >= btnY && MouseManager.Y <= btnY + btnSize)
+                for (int i = 0; i < 16; i++)
+                {
+                    int col = i % 4;
+                    int row = i / 4;
+                    int bx = startX + col * (BtnSize + BtnGap);
+                    int by = startY + row * (BtnSize + BtnGap);
+
+                    if (MouseManager.X >= bx && MouseManager.X < bx + BtnSize &&
+                        MouseManager.Y >= by && MouseManager.Y < by + BtnSize)
                     {
                         ProcessInput(buttons[i]);
-                        // Simple debounce
                         while (MouseManager.MouseState == MouseState.Left) { }
                         return;
                     }
-
-                    x++;
-                    if (x > 3) { x = 0; y++; }
                 }
             }
         }
 
         private void ProcessInput(string input)
         {
-            double val;
-            if (double.TryParse(input, out val)) // Number
+            if (double.TryParse(input, out _))
             {
-                if (newEntry || display == "0" || display == "Error")
-                {
-                    display = input;
-                    newEntry = false;
-                }
-                else
-                {
-                    if (display.Length < 10) // Limit digits
-                        display += input;
-                }
+                if (newEntry || display == "0") { display = input; newEntry = false; }
+                else if (display.Length < 12) display += input;
             }
-            else // Operator or Command
+            else if (input == "C")
             {
-                if (input == "C")
+                display = "0"; firstOperand = 0; currentOp = ""; newEntry = true;
+            }
+            else if (input == "=")
+            {
+                if (!string.IsNullOrEmpty(currentOp) && double.TryParse(display, out double second))
                 {
-                    display = "0";
-                    firstOperand = 0;
+                    double result = currentOp switch
+                    {
+                        "+" => firstOperand + second,
+                        "-" => firstOperand - second,
+                        "*" => firstOperand * second,
+                        "/" => second != 0 ? firstOperand / second : 0,
+                        _ => second
+                    };
+                    display = result.ToString();
                     currentOp = "";
                     newEntry = true;
                 }
-                else if (input == "=")
+            }
+            else
+            {
+                if (double.TryParse(display, out firstOperand))
                 {
-                    if (!string.IsNullOrEmpty(currentOp))
-                    {
-                        double secondOperand;
-                        if (double.TryParse(display, out secondOperand))
-                        {
-                            double result = 0;
-                            bool error = false;
-                            switch (currentOp)
-                            {
-                                case "+": result = firstOperand + secondOperand; break;
-                                case "-": result = firstOperand - secondOperand; break;
-                                case "*": result = firstOperand * secondOperand; break;
-                                case "/":
-                                    if (secondOperand != 0) result = firstOperand / secondOperand;
-                                    else error = true;
-                                    break;
-                            }
-
-                            if (error) display = "Error";
-                            else display = result.ToString();
-                        }
-                        currentOp = "";
-                        newEntry = true;
-                    }
-                }
-                else // Operator
-                {
-                    if (double.TryParse(display, out firstOperand))
-                    {
-                         currentOp = input;
-                         newEntry = true;
-                    }
+                    currentOp = input;
+                    newEntry = true;
                 }
             }
         }
 
         public override void Draw(Canvas canvas)
         {
-            // Draw Window Background
-            canvas.DrawFilledRectangle(Color.LightGray, startX - 20, startY - 20, (btnSize + 10) * 4 + 30, (btnSize + 10) * 4 + 140);
+            canvas.DrawString("CALCULATOR", PCScreenFont.Default, Kernel.CyanPen, Kernel.ScreenWidth / 2 - 45, 20);
 
-            // Draw Display
-            canvas.DrawFilledRectangle(Color.White, startX, startY, (btnSize + 10) * 4 - 10, 60);
-            canvas.DrawString(display, PCScreenFont.Default, Color.Black, startX + 10, startY + 20);
+            // Display
+            int startX = (Kernel.ScreenWidth - (4 * BtnSize + 3 * BtnGap)) / 2;
+            canvas.DrawFilledRectangle(Kernel.LightGrayPen, startX, 80, 4 * BtnSize + 3 * BtnGap, 50);
+            canvas.DrawString(display, PCScreenFont.Default, Kernel.BlackPen, startX + 10, 100);
 
-            // Draw Buttons
-            int x = 0, y = 0;
-            for (int i = 0; i < buttons.Length; i++)
+            // Buttons
+            int startY = 150;
+            for (int i = 0; i < 16; i++)
             {
-                int btnX = startX + (x * (btnSize + 10));
-                int btnY = startY + 100 + (y * (btnSize + 10));
+                int col = i % 4;
+                int row = i / 4;
+                int bx = startX + col * (BtnSize + BtnGap);
+                int by = startY + row * (BtnSize + BtnGap);
 
-                canvas.DrawFilledRectangle(Color.DarkGray, btnX, btnY, btnSize, btnSize);
-                canvas.DrawString(buttons[i], PCScreenFont.Default, Color.White, btnX + 20, btnY + 20);
-
-                x++;
-                if (x > 3) { x = 0; y++; }
+                canvas.DrawFilledRectangle(Kernel.GrayPen, bx, by, BtnSize, BtnSize);
+                canvas.DrawString(buttons[i], PCScreenFont.Default, Kernel.WhitePen, bx + 25, by + 22);
             }
+
+            canvas.DrawString("[ESC] Exit", PCScreenFont.Default, Kernel.GrayPen, 10, Kernel.ScreenHeight - 20);
         }
     }
 }
